@@ -1,0 +1,364 @@
+import pygame
+import random
+import sys
+
+# zawsze wpisujemy
+pygame.init()
+
+# ekran
+screen = pygame.display.set_mode((200, 250), 100)
+# czcionka
+font = pygame.font.SysFont('comic sans', 20)
+
+
+# funkcja dodawania tekstu
+def draw_text(text, font, color, surface, x, y):
+    textobj = font.render(text, 1, color)
+    textrect = textobj.get_rect()
+    textrect.topleft = (x, y)
+    surface.blit(textobj, textrect)
+
+
+# funkcja okna twórców
+def creators():
+    running = True
+    while running:
+        screen.fill((70, 0, 0))
+        # autorzy
+        draw_text('Kacper Płotka', font, (255, 255, 255), screen, 13, 20)
+        draw_text('Kacper Leszczyński', font, (255, 255, 255), screen, 13, 100)
+        draw_text('Michał Matulaniec', font, (255, 255, 255), screen, 13, 180)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+        pygame.display.update()
+
+
+click = False
+
+
+# funkcja menu
+def main_menu():
+    global click
+    while True:
+
+        # kolor tła menu
+        screen.fill((70, 0, 0))
+        draw_text('MENU', font, (255, 255, 255), screen, 65, 20)
+
+        menu_x, menu_y = pygame.mouse.get_pos()
+
+        # tworzy niewidzialne przyciski do kliknięcia
+        button_1 = pygame.Rect(50, 100, 200, 50)
+        # dodaje napis
+        draw_text('PLAY', font, (255, 255, 255), screen, 73, 110)
+        button_2 = pygame.Rect(50, 200, 200, 50)
+        draw_text('AUTORZY', font, (255, 255, 255), screen, 50, 200)
+
+        # upewnia się czy klikneliśmy przycisk 1 czy 2
+        if button_1.collidepoint((menu_x, menu_y)):
+            if click:
+                game()
+        if button_2.collidepoint((menu_x, menu_y)):
+            if click:
+                creators()
+
+        click = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    click = True
+
+        pygame.display.update()
+
+
+# funkcja gry
+def game():
+    global screen
+    running = True
+    while running:
+        screen.fill((70, 0, 0))
+
+        # odtąd jest gra
+
+        # klatki na sekunde
+        clock = pygame.time.Clock()
+        fps = 60
+
+        # dane - okno
+        dolny_panel = 150
+        screen_szerokosc = 700
+        screen_wysokosc = 550 + dolny_panel
+
+        # okno gry - szerokość, wysokość
+        screen = pygame.display.set_mode((screen_szerokosc, screen_wysokosc))
+        # nazwa w oknie
+        pygame.display.set_caption('RPG_projekt')
+
+        # dane - rozgrywka
+        current_fighter = 1
+        total_fighters = 3
+        action_cooldown = 0
+        action_wait_time = 40
+
+        clicked = False
+
+        # czcionka
+        font = pygame.font.SysFont('comicsans', 26)
+        font_winner = pygame.font.SysFont('comicsans', 70)
+
+        # kolory
+        red = (255, 0, 0)
+        green = (0, 255, 0)
+        blue = (240, 248, 255)
+
+        # dane - obrazy
+        # tło
+        image_background = pygame.image.load('RPG/tło/tło.jpeg').convert_alpha()
+        # panel
+        image_panel = pygame.image.load('RPG/ikony/panel.png').convert_alpha()
+        # miecz - kursor
+        image_sword = pygame.image.load('RPG/miecz/miecz.png').convert_alpha()
+
+        # funkcja do dodawania tekstu
+        def draw_text(text, font, text_col, x, y):
+            img = font.render(text, True, text_col)
+            screen.blit(img, (x, y))
+
+        # funkcja do dodania tła
+        def draw_bg():
+            screen.blit(image_background, (-100, -300))
+
+        # funkcja do dodania panelu
+        def draw_panel():
+            # prostokąt panelu
+            screen.blit(image_panel, (-200, 530))
+            # pokazuje imie i hp gracz
+            draw_text(f'{gracz.name} HP: {gracz.hp}', font, blue, 50, screen_wysokosc - dolny_panel + 10)
+            for count, i in enumerate(monster_list):
+                # pokazuje imie i hp przeciwników
+                draw_text(f'{i.name} HP: {i.hp}', font, blue, 400, (screen_wysokosc - dolny_panel + 10) + count * 60)
+
+        # funkcja do dodania tekstu zwycięzcy
+        def draw_winner(text):
+            draw_text = font_winner.render(text, True, blue)
+            screen.blit(draw_text, (350 - draw_text.get_width() / 2, 100 - draw_text.get_height() / 2))
+            pygame.display.update()
+            # czas przed zamknięciem gry
+            pygame.time.delay(5000)
+
+        # klasa gracza i przeciwnika
+        class Fighter():
+            def __init__(self, x, y, name, max_hp, strength):
+                self.name = name
+                self.max_hp = max_hp
+                self.hp = max_hp
+                self.strength = strength
+                self.alive = True
+                self.animation_list = []
+                self.frame_index = 0
+                self.action = 0
+                self.update_time = pygame.time.get_ticks()
+                # ładuje obrazy animacji stania
+                temp_list = []
+                for i in range(2):
+                    img = pygame.image.load(f'RPG/{self.name}/stoi/{i}.png')
+                    img = pygame.transform.scale(img, (img.get_width() * 2, img.get_height() * 2))
+                    temp_list.append(img)
+                self.animation_list.append(temp_list)
+                # ładuje obrazy animacji ataku
+                temp_list = []
+                for i in range(2):
+                    img = pygame.image.load(f'RPG/{self.name}/atak/{i}.png')
+                    img = pygame.transform.scale(img, (img.get_width() * 2, img.get_height() * 2))
+                    temp_list.append(img)
+                self.animation_list.append(temp_list)
+                self.image = self.animation_list[self.action][self.frame_index]
+                self.rect = self.image.get_rect()
+                self.rect.center = (x, y)
+
+            def update(self):
+                # predkość animacji
+                animation_cooldown = 150
+                # animacja
+                self.image = self.animation_list[self.action][self.frame_index]
+                if pygame.time.get_ticks() - self.update_time > animation_cooldown:
+                    self.update_time = pygame.time.get_ticks()
+                    self.frame_index += 1
+                # gdy klatki animacji się konczą, wraca do początku
+                if self.frame_index >= len(self.animation_list[self.action]):
+                    self.idle()
+
+            def idle(self):
+                # dane animacji ataku
+                self.action = 0
+                self.frame_index = 0
+                self.update_time = pygame.time.get_ticks()
+
+            def attack(self, target):
+                # obrażenia ataku
+                rand = random.randint(-6, 6)
+                damage = self.strength + rand
+                target.hp -= damage
+                # sprawdza czy cel nie żyje
+                if target.hp < 1:
+                    target.hp = 0
+                    target.alive = False
+                # dane animacji ataku
+                self.action = 1
+                self.frame_index = 0
+                self.update_time = pygame.time.get_ticks()
+
+            # dodaje nam obrazy gracza i przeciwników
+            def draw(self):
+                screen.blit(self.image, self.rect)
+
+        # klasa paska życia
+        class HealthBar():
+            def __init__(self, x, y, hp, max_hp):
+                self.x = x
+                self.y = y
+                self.hp = hp
+                self.max_hp = max_hp
+
+            def draw(self, hp):
+                # update with new health
+                self.hp = hp
+                # calculate health ratio
+                ratio = self.hp / self.max_hp
+                # dodaje 2 paski życia nałożone na siebie
+                pygame.draw.rect(screen, red, (self.x, self.y, 150, 20))
+                pygame.draw.rect(screen, green, (self.x, self.y, 150 * ratio, 20))
+
+        # statystyki gracza i przeciwników
+        gracz = Fighter(120, 300, 'gracz', 100, 9)
+        monster1 = Fighter(380, 300, 'przeciwnik', 50, 6)
+        monster2 = Fighter(600, 300, 'przeciwnik', 50, 6)
+
+        # lista przeciwników
+        monster_list = [monster1, monster2]
+
+        # paski życia
+        gracz_health_bar = HealthBar(50, screen_wysokosc - dolny_panel + 50, gracz.hp, gracz.max_hp)
+        monster1_health_bar = HealthBar(430, screen_wysokosc - dolny_panel + 50, monster1.hp, monster1.max_hp)
+        monster2_health_bar = HealthBar(430, screen_wysokosc - dolny_panel + 110, monster2.hp, monster2.max_hp)
+
+        # pętla
+        run = True
+        while run:
+
+            # FPS
+            clock.tick(fps)
+
+            # dodaje na ekran tło
+            draw_bg()
+
+            # dodaje na ekran panel
+            draw_panel()
+            gracz_health_bar.draw(gracz.hp)
+            monster1_health_bar.draw(monster1.hp)
+            monster2_health_bar.draw(monster2.hp)
+
+            # dodaje na ekran gracza
+            gracz.update()
+            gracz.draw()
+
+            # dodaje na ekran przeciwników
+            for monster in monster_list:
+                monster.update()
+                monster.draw()
+
+            # resetuje dane
+            attack = False
+            target = None
+            # upewnia się czy kursor jest widoczny
+            pygame.mouse.set_visible(True)
+            pos = pygame.mouse.get_pos()
+            for count, monster in enumerate(monster_list):
+                if monster.rect.collidepoint(pos):
+                    # chowa kursor na przeciwniku
+                    pygame.mouse.set_visible(False)
+                    # pokazuje miecz w miejscu kursora
+                    screen.blit(image_sword, pos)
+                    if clicked == True:
+                        attack = True
+                        target = monster_list[count]
+
+            # akcje gracz
+            if gracz.alive == True:
+                if current_fighter == 1:
+                    action_cooldown += 1
+                    if action_cooldown >= action_wait_time:
+                        # look for player action
+                        # attack
+                        if attack == True and target != None:
+                            gracz.attack(target)
+                            current_fighter += 1
+                            action_cooldown = 0
+
+            # akcje przeciwnika
+            for count, monster in enumerate(monster_list):
+                if current_fighter == 2 + count:
+                    if monster.alive == True:
+                        action_cooldown += 1
+                        if action_cooldown >= action_wait_time:
+                            # attack
+                            monster.attack(gracz)
+                            current_fighter += 1
+                            action_cooldown = 0
+                    else:
+                        current_fighter += 1
+
+            # jak wszyscy gracze zrobili ruch, tura się resetuje
+            if current_fighter > total_fighters:
+                current_fighter = 1
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+
+                # patrzy czy klikneliśmy
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    clicked = True
+                else:
+                    clicked = False
+
+            # patrzy kto wygrał i daje odpowiedni tekst
+            winner_text = ""
+            if gracz.alive == False:
+                winner_text = "PRZEGRYWASZ :("
+            elif monster1.alive == False and monster2.alive == False:
+                winner_text = "WYGRYWASZ!!"
+            if winner_text != "":
+                draw_winner(winner_text)
+                break
+            # aktualizuje wyświetlanie gry
+            pygame.display.update()
+        # wyłącza gre
+        pygame.quit()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+        pygame.display.update()
+
+
+main_menu()
